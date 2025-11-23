@@ -1,4 +1,4 @@
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 import os
 from IPython.display import Markdown, display
@@ -143,16 +143,12 @@ def validate_about_me(about_me_generated_json, about_me_original, model="gpt-4.1
           }
       return result
 
+if __name__ == '__main__':
+    examples = None
+    details = "I am a computer science engineer currently doing a certification on data science"
+    print('v', __version__, write_about_me_v1(details))
 
-
-
-
-    if __name__ == '__main__':
-        examples = None
-        details = "I am a computer science engineer currently doing a certification on data science"
-        print('v', __version__, write_about_me_v1(details))
-
-        generated_about_me_json = write_about_me(details, examples)
-        about_me_original = details
-        print('v', __version__, validate_about_me(generated_about_me_json, about_me_original))
+    generated_about_me_json = write_about_me(details, examples)
+    about_me_original = details
+    print('v', __version__, validate_about_me(generated_about_me_json, about_me_original))
 
