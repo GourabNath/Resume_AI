@@ -1,0 +1,76 @@
+__version__ = "0.1.0"
+
+import os
+from IPython.display import Markdown, display
+from openai import OpenAI
+import openai
+import json
+
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+def write_about_me(details, about_me_rules=None, model = "gpt-4.1-nano"):
+    """
+    Description: This function helps an user to re-write the about me section of a resume based on the user details and a set of pre-defined rules.
+
+    Arg:
+    details (str): details of users-entered about me in the raw text form.
+    about_me_rules (str): a set of rules to be provided to the LLM as a guideline to write teh about me. Default is None.
+    model = the LLM model to be used
+
+    Out:
+    Returns output in JSON (field names: about, highlights, sources, tokens, tone, confidence)
+    """
+
+
+    system_prompt = f""""You are a professional resume builder who specifically helps to write the 'about me' section of a resume. Here's what you are expected to do:
+                    1. Write a very enthusiastic version of about me that is expected to attract recruiter's attention
+                    2. Keep it short and crisp - energetic and thrilling (6-8 lines)
+                    3. Do not make it very generic
+                    4. Pick specific details from the user input and personalize your write-up and make it user-specific
+                    Return the output **strictly in JSON** using this format:
+                          {{
+                            "about": "...",
+                            "highlights": ["...", "..."],
+                            "tokens": <int>,
+                            "tone": "energetic",
+                            "sources": ["...","..."],
+                            "confidence": <float between 0 and 1>
+                          }}
+
+                    Additionally, use the linkedIN about me rules of do's and dont's to polish it further:
+                    {about_me_rules}
+
+                    Examples:
+                    {examples}
+                    """
+
+    #The user prompt is details the user provide for about me
+    user_prompt = details
+
+    #The message list
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt}
+    ]
+
+
+    #3. Call OpenAI
+    response = openai.chat.completions.create(model=model, messages=messages, temperature=0.6)
+
+    #4. return the results
+    content = response.choices[0].message.content
+
+    #5. Parse JSON safely
+    try:
+        data = json.loads(content)
+    except:
+        data = {"about": content, "highlights": [], "confidence": 0.5}
+
+    return data
+
+
+    if __name__ == '__main__':
+        examples = None
+        details = "I am a computer science engineer currently doing a certification on data science"
+        print('v', __version__, write_about_me_v1(details))
+
