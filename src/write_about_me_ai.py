@@ -1,8 +1,4 @@
-__version__ = "0.4.0"
-
-# Writing this function in GitHub 
-
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 
 import os
 from IPython.display import Markdown, display
