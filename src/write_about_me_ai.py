@@ -1,4 +1,4 @@
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 import os
 from IPython.display import Markdown, display
@@ -69,8 +69,90 @@ def write_about_me(details, about_me_rules=None, model = "gpt-4.1-nano"):
     return data
 
 
+
+def validate_about_me(about_me_generated_json, about_me_original, model="gpt-4.1-mini"):
+      """
+      Description: This function is used to validate the performance of the about me generator.
+
+      Args:
+      about_me_generated_json (JSON): JSON with field names (about, highlights, sources, tokens, tone, confidence).
+      about_me_original (str): details of users-entered about me in the raw text form.
+      model = the LLM model to be used
+
+      Out:
+      Returns output in JSON for the following format:
+                      {{
+                        "decision": "go" or "no-go",
+                        "score": <float 0..1>,
+                        "reasons": ["..."],
+                        "checks": {{
+                          "length_ok": true/false,
+                          "uses_specifics": true/false,
+                          "no_hallucination": true/false
+                        }}
+
+      """
+
+      # System prompts
+      system_prompt = f"""
+                        You are a strict resume-quality validator. You will receive:
+                        1) the generated about-me JSON (field names: about, highlights, sources, tokens, tone, confidence)
+                        2) the original user details used to generate the about-me.
+
+                        Tasks:
+                        - Verify factual consistency: every item in highlights/sources must be supported by original details or marked as hallucination.
+                        - Verify length: about should be 6-10 lines (tolerate ±2).
+                        - Verify tone and specificity (energetic, not generic).
+                        - Produce a strict JSON response ONLY in this format:
+
+                        {{
+                        "decision": "go" or "no-go",
+                        "score": <float 0..1>,
+                        "reasons": ["..."],
+                        "checks": {{
+                          "length_ok": true/false,
+                          "uses_specifics": true/false,
+                          "no_hallucination": true/false
+                        }}
+
+                        """
+
+      # Messages
+      messages = [
+          {"role": "system", "content": system_prompt},
+          {"role": "user", "content": json.dumps({          #json.dumps helps to convert JSON into string
+              "generated": about_me_generated_json,
+              "original_details": about_me_original
+          })}
+      ]
+
+      #Call OpenAI API
+      resp = openai.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=400)
+      content = resp.choices[0].message.content
+
+      try:
+          result = json.loads(content)
+      except Exception:
+          # fallback conservative answer
+          result = {
+              "decision": "no-go",
+              "score": 0.0,
+              "reasons": ["validator failed to parse model output"],
+              "checks": {"length_ok": False, "uses_specifics": False, "no_hallucination": False},
+              "suggested_about": ""
+          }
+      return result
+
+
+
+
+
     if __name__ == '__main__':
         examples = None
         details = "I am a computer science engineer currently doing a certification on data science"
         print('v', __version__, write_about_me_v1(details))
+
+        generated_about_me_json = write_about_me(details, examples)
+        about_me_original = details
+        print('v', __version__, validate_about_me(generated_about_me_json, about_me_original))
 
