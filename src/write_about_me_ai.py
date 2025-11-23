@@ -1,4 +1,4 @@
-__version__ = "0.2.1"
+__version__ = "0.3.0"
 
 import os
 from IPython.display import Markdown, display
@@ -8,22 +8,33 @@ import json
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-def write_about_me(details, about_me_rules=None, model = "gpt-4.1-nano"):
+def write_about_me(details, about_me_rules, feedback_history=None, model = "gpt-4.1-nano"):
     """
     Description: This function helps an user to re-write the about me section of a resume based on the user details and a set of pre-defined rules.
+                 This version (v2) also uses the last three validation results as memory to improve the results.
 
     Arg:
     details (str): details of users-entered about me in the raw text form.
     about_me_rules (str): a set of rules to be provided to the LLM as a guideline to write teh about me. Default is None.
+    feedback_history (list): a list containing the previous feedbacks on the generated outputs.
     model = the LLM model to be used
 
     Out:
     Returns output in JSON (field names: about, highlights, sources, tokens, tone, confidence)
     """
 
+    # Keep only the last 3 feedback entries (if any)
+    if feedback_history:
+        feedback_history_to_use = feedback_history[-3:]
+    else:
+        feedback_history_to_use = []
 
-    system_prompt = f""""You are a professional resume builder who specifically helps to write the 'about me' section of a resume. Here's what you are expected to do:
-                    1. Write a very enthusiastic version of about me that is expected to attract recruiter's attention
+    # Convert to JSON string (pretty format) only if non-empty
+    feedback_history_str = json.dumps(feedback_history_to_use, indent=2) if feedback_history_to_use else ""
+
+    #Create your prompts
+    system_prompt = f"""You are a professional resume builder who specifically helps to write the 'about me' section of a resume. Here's what you are expected to do:
+                    1. Write a very enthusiastic version of about that is expected to attract recruiter's attention
                     2. Keep it short and crisp - energetic and thrilling (6-8 lines)
                     3. Do not make it very generic
                     4. Pick specific details from the user input and personalize your write-up and make it user-specific
@@ -42,25 +53,28 @@ def write_about_me(details, about_me_rules=None, model = "gpt-4.1-nano"):
 
                     Examples:
                     {examples}
+
+                    Here are feedback of your previous work:
+                    {feedback_history_str}
+                    You should be able to learn from the feedback and improve your response.
                     """
 
-    #The user prompt is details the user provide for about me
     user_prompt = details
 
-    #The message list
+    #Create your message list
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt}
     ]
 
 
-    #3. Call OpenAI
-    response = openai.chat.completions.create(model=model, messages=messages, temperature=0.6)
+    #Call OpenAI
+    response = openai.chat.completions.create(model=model, messages=messages, temperature=0.4)
 
-    #4. return the results
+    #return the results
     content = response.choices[0].message.content
 
-    #5. Parse JSON safely
+    #Parse JSON safely
     try:
         data = json.loads(content)
     except:
@@ -144,11 +158,10 @@ def validate_about_me(about_me_generated_json, about_me_original, model="gpt-4.1
       return result
 
 if __name__ == '__main__':
-    examples = None
+    about_me_rules = None
     details = "I am a computer science engineer currently doing a certification on data science"
-    print('v', __version__, write_about_me_v1(details))
+    print('v', __version__, write_about_me(details, about_me_rules))
 
-    generated_about_me_json = write_about_me(details, examples)
+    generated_about_me_json = write_about_me(details, about_me_rules)
     about_me_original = details
     print('v', __version__, validate_about_me(generated_about_me_json, about_me_original))
-
