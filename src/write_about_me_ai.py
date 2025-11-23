@@ -1,4 +1,8 @@
-__version__ = "0.3.0"
+__version__ = "0.4.0"
+
+# Writing this function in GitHub 
+
+__version__ = "0.4.0"
 
 import os
 from IPython.display import Markdown, display
@@ -84,13 +88,15 @@ def write_about_me(details, about_me_rules, feedback_history=None, model = "gpt-
 
 
 
-def validate_about_me(about_me_generated_json, about_me_original, model="gpt-4.1-mini"):
+def validate_about_me(about_me_generated_json, about_me_original, about_me_rules=None, model="gpt-4.1-nano"):   #without memory
       """
-      Description: This function is used to validate the performance of the about me generator.
+      Description: This function is used to validate the performance of the about me generator by comparing it with a set of pre-defined rules.
+                   This version (v2) contains modified system prompt to improve the scoring criteria.
 
       Args:
       about_me_generated_json (JSON): JSON with field names (about, highlights, sources, tokens, tone, confidence).
       about_me_original (str): details of users-entered about me in the raw text form.
+      about_me_rules (str): a set of rules to be provided to the LLM as a guideline to write teh about me. Default is None.
       model = the LLM model to be used
 
       Out:
@@ -107,9 +113,8 @@ def validate_about_me(about_me_generated_json, about_me_original, model="gpt-4.1
 
       """
 
-      # System prompts
       system_prompt = f"""
-                        You are a strict resume-quality validator. You will receive:
+                        You are a resume-quality validator. You will receive:
                         1) the generated about-me JSON (field names: about, highlights, sources, tokens, tone, confidence)
                         2) the original user details used to generate the about-me.
 
@@ -118,29 +123,41 @@ def validate_about_me(about_me_generated_json, about_me_original, model="gpt-4.1
                         - Verify length: about should be 6-10 lines (tolerate ±2).
                         - Verify tone and specificity (energetic, not generic).
                         - Produce a strict JSON response ONLY in this format:
+                              {{
+                              "decision": "go" or "no-go",
+                              "score": <float 0..1>,
+                              "reasons": ["..."],
+                              "checks": {{
+                                "length_ok": true/false,
+                                "uses_specifics": true/false,
+                                "no_hallucination": true/false
+                              }}
 
-                        {{
-                        "decision": "go" or "no-go",
-                        "score": <float 0..1>,
-                        "reasons": ["..."],
-                        "checks": {{
-                          "length_ok": true/false,
-                          "uses_specifics": true/false,
-                          "no_hallucination": true/false
-                        }}
+                        - Be a sensitive evaluater and your score SHOULDN'T biased numbers like 0.55, 0.65, etc.
+                        - TRY TO KEEP THE SCORES AS FLOATING NUMBERS BETWEEN 0 AND 1. (NEED NOT BE IN THE MULTIPLE OF 5 OR 10)
+                        - Here is your SCORING WEIGHTS:
+                                length = 20%  (should be short and crisp)
+                                tone = 20% (should be energetic, vibrant, and not generic)
+                                informative = 40% (should contains many specific information about the person and its experience; generic output = low score, specific output = high score)
+                                overall construction = 20% (professionally build paragraph = high score, scattered = low score)
 
-                        """
 
-      # Messages
+
+                    Make sure the generated texts are bounded by the following rules:
+                    {about_me_rules}
+
+                    Here is an example of (input, output) pair:
+                    {examples}
+              """
+
       messages = [
           {"role": "system", "content": system_prompt},
-          {"role": "user", "content": json.dumps({          #json.dumps helps to convert JSON into string
+          {"role": "user", "content": json.dumps({
               "generated": about_me_generated_json,
               "original_details": about_me_original
           })}
       ]
 
-      #Call OpenAI API
       resp = openai.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=400)
       content = resp.choices[0].message.content
 
@@ -153,15 +170,18 @@ def validate_about_me(about_me_generated_json, about_me_original, model="gpt-4.1
               "score": 0.0,
               "reasons": ["validator failed to parse model output"],
               "checks": {"length_ok": False, "uses_specifics": False, "no_hallucination": False},
-              "suggested_about": ""
           }
       return result
+
+
 
 if __name__ == '__main__':
     about_me_rules = None
     details = "I am a computer science engineer currently doing a certification on data science"
     print('v', __version__, write_about_me(details, about_me_rules))
 
+    examples=None
     generated_about_me_json = write_about_me(details, about_me_rules)
     about_me_original = details
     print('v', __version__, validate_about_me(generated_about_me_json, about_me_original))
+
